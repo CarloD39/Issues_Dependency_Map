@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>GitLab Iteration Map - vis-network</title>
+  <script defer src="https://unpkg.com/vis-network@9.1.9/dist/vis-network.min.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/vis-network@9.1.9/styles/vis-network.min.css" />
+  <link rel="stylesheet" href="style.css">
+  <script defer src="app.js"></script>
+  <style>
+    :root{--bg:linear-gradient(180deg,var(--panel),#111933);--panel:#182348;--panel2:#182348;--text:#ecf1ff;--muted:#a9b6df;--border:#2b3b73;--accent:#7aa2ff;--ok:#6dd6a1;--warn:#ffb86b;--danger:#ff7a7a}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
+    .app{display:grid;grid-template-columns:380px 1fr;min-height:100vh}
+    .header-container {
+    display: flex;
+    align-items: center;
+    gap: 20px; 
+    }
+    .sidebar{background:linear-gradient(180deg,var(--panel),#0871a5);border-right:1px solid var(--border);padding:18px;height:100vh; overflow-y:auto;overflow-x:hidden;}
+    .main{position:relative;min-height:100vh;background:radial-gradient(circle at 15% 20%, rgba(122,162,255,.09), transparent 22%),radial-gradient(circle at 80% 30%, rgba(109,214,161,.06), transparent 26%),radial-gradient(circle at 40% 80%, rgba(255,184,107,.06), transparent 24%)}
+    h1{margin:0 0 10px;font-size:21px}
+    h2{margin:18px 0 8px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+    .help,.small{font-size:13px;color:var(--muted);line-height:1.45}
+    label{display:block;margin:12px 0 6px;font-size:13px;color:var(--muted)}
+    input,select{width:100%;background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:10px 12px;outline:none}
+    input:focus,select:focus{border-color:var(--accent)}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    button{width:100%;margin-top:12px;border:0;border-radius:10px;background:var(--accent);color:#081127;font-weight:700;padding:11px 12px;cursor:pointer}
+    button.secondary{background:transparent;color:var(--text);border:1px solid var(--border)}
+    .guideBtn{background:transparent;color:#df330d;border:1px solid var(--border)}
+    .toolbar{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .status{margin-top:12px;padding:10px 12px;border-radius:10px;border:1px solid rgba(122,162,255,.28);background:rgba(122,162,255,.08);color:var(--muted);white-space:pre-wrap;font-size:13px}
+    .stats{margin-top:12px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+    .card{padding:10px;border-radius:12px;border:1px solid var(--border);background:rgba(255,255,255,.03)}
+    .k{font-size:12px;color:var(--muted)} .v{font-size:20px;font-weight:700;margin-top:4px}
+    .legend-item{display:flex;align-items:center;gap:8px;margin:7px 0;font-size:13px;color:var(--muted)}
+    .dot{width:14px;height:14px;border-radius:999px;display:inline-block;border:1px solid rgba(255,0,0,.35)}
+    .line{width:26px;height:0;border-top:2px solid;display:inline-block}
+    .line.dashed{border-top-style:dashed}
+    .parent-box{
+      width:26px;
+      height:16px;
+      border-radius:5px;
+      display:inline-block;
+      border:2px solid #b388ff;
+      background:rgba(179,136,255,.12);
+    }
+    #network{width:100%;height:100vh}
+    .topbar{position:absolute;top:14px;right:14px;display:flex;gap:8px;z-index:5;background:rgba(8,12,26,.78);border:1px solid var(--border);border-radius:14px;padding:8px;backdrop-filter:blur(8px)}
+    .topbar button{margin:0;width:auto;padding:8px 10px;font-size:12px}
+    code{background:rgba(255,255,255,.06);padding:2px 5px;border-radius:6px}
+    .footer-note{margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,.08)}
+  </style>
+</head>
+
+<body>
+
+  <div id="guideModal" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>GitLab Dependencies Map - Guida</h2>
+        <button id="closeGuideBtn" class="modal-close">×</button>
+      </div>
+
+      <div class="modal-body">
+
+        <h2>Guida all’utilizzo</h2>
+
+        <p>
+          Questo strumento permette di visualizzare le dipendenze tra issue GitLab sotto forma di grafo.
+          È pensato per supportare planning, refinement e coordinamento tra team.
+        </p>
+
+        <hr>
+
+        <h3>Tipi di mappa</h3>
+
+        <p><strong>Iteration Map</strong></p>
+        <ul>
+          <li>Mostra le issue appartenenti a una o più iteration</li>
+          <li>Ideale per analizzare uno sprint</li>
+          <li>Permette di individuare blocchi e dipendenze temporali</li>
+        </ul>
+
+        <p><strong>Epic Map</strong></p>
+        <ul>
+          <li>Mostra le issue appartenenti a una specifica epic</li>
+          <li>Le issue esterne collegate vengono mostrate in grigio</li>
+          <li>Ideale per comprendere lo scope di una feature</li>
+        </ul>
+
+        <hr>
+
+        <h3>Filtri principali</h3>
+
+        <p><strong>Scope</strong></p>
+        <ul>
+          <li><strong>All</strong> → tutte le issue</li>
+          <li><strong>Assigned to me</strong> → solo issue assegnate a te</li>
+          <li><strong>Created by me</strong> → issue create da te</li>
+        </ul>
+
+        <p><strong>Issues relation types</strong></p>
+        <ul>
+          <li><strong>All</strong> → tutte le relazioni</li>
+          <li><strong>Block/Blocked by</strong> → solo relazioni di blocco</li>
+        </ul>
+
+        <p>
+          Questo filtro è fondamentale per il planning:
+          limita la vista alle dipendenze critiche.
+        </p>
+
+        <p><strong>Scheduling types</strong></p>
+        <ul>
+          <li><strong>All</strong> → tutte le issue</li>
+          <li><strong>Planned only</strong> → solo issue con label di pianificazione</li>
+        </ul>
+
+        <p><strong>Out of scope issues</strong></p>
+        <ul>
+          <li><strong>Show</strong> → include issue esterne collegate</li>
+          <li><strong>Hide</strong> → mostra solo issue nello scope selezionato</li>
+        </ul>
+
+        <p>
+          In Iteration Map → esterne = fuori iteration  
+          In Epic Map → esterne = fuori epic
+        </p>
+
+        <p><strong>Epic (Parent filter)</strong></p>
+        <ul>
+          <li><strong>All</strong> → mostra tutte le epic</li>
+          <li><strong>Open Epic</strong> → nasconde epic concluse (QA Passed)</li>
+          <li><strong>None</strong> → nasconde tutte le epic</li>
+        </ul>
+
+        <hr>
+
+        <h3>Come combinare i filtri</h3>
+
+        <p><strong>Analisi dei blocchi (consigliato)</strong></p>
+        <ul>
+          <li>Issues relation types → Block/Blocked by</li>
+          <li>Out of scope → Show</li>
+        </ul>
+
+        <p>
+          Permette di vedere cosa blocca lo sprint anche fuori iteration o epic.
+        </p>
+
+        <p><strong>Vista pulita</strong></p>
+        <ul>
+          <li>Out of scope → Hide</li>
+        </ul>
+
+        <p>
+          Mostra solo ciò che appartiene allo scope selezionato.
+        </p>
+
+        <p><strong>Focus sul lavoro pianificato</strong></p>
+        <ul>
+          <li>Scheduling types → Planned only</li>
+        </ul>
+
+        <hr>
+
+        <h3>Come leggere la mappa</h3>
+
+        <p><strong>Nodi (issue)</strong></p>
+
+        <ul>
+          <li><strong>Blu</strong> → issue nello scope selezionato</li>
+          <li><strong>Grigio</strong> → issue esterna collegata</li>
+          <li><strong>Bordo verde</strong> → issue chiusa</li>
+        </ul>
+
+        <p><strong>Epic / Parent</strong></p>
+        <ul>
+          <li>Rappresentate come rettangoli</li>
+          <li>La epic selezionata è evidenziata</li>
+        </ul>
+
+        <p><strong>Relazioni</strong></p>
+        <ul>
+          <li><strong>Linea arancione</strong> → blocks / blocked_by</li>
+          <li><strong>Linea tratteggiata</strong> → relates_to</li>
+        </ul>
+
+        <p>
+          Le relazioni mostrano come le issue dipendono tra loro.
+        </p>
+
+        <hr>
+
+        <h3>Interazioni</h3>
+
+        <ul>
+          <li><strong>Hover</strong> → mostra dettagli della issue</li>
+          <li><strong>Doppio click</strong> → apre l’issue su GitLab</li>
+          <li><strong>Scroll</strong> → zoom</li>
+          <li><strong>Drag</strong> → sposta la mappa</li>
+        </ul>
+
+        <hr>
+
+        <h3>Consigli pratici</h3>
+
+        <ul>
+          <li>Usa <strong>Block/Blocked by</strong> per il planning</li>
+          <li>Attiva <strong>Out of scope = Show</strong> per vedere dipendenze reali</li>
+          <li>Disattiva le epic se vuoi una vista più pulita</li>
+          <li>Usa la Epic Map per capire l’impatto di una feature</li>
+        </ul>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="app">
+    <aside class="sidebar">
+      <div class="header-container">
+        <h1>Dependencies Map</h1>
+      </div>
+
+
+      <label for="gitlabUrl">GitLab URL</label>
+      <input id="gitlabUrl" type="text" value="https://gitlab.com/" autocomplete="off"/>
+
+      <label for="token">Personal Access Token</label>
+      <input id="token" type="password" placeholder="GitLab Personal Access Token" />
+
+      <label for="mapMode">Map type</label>
+      <select id="mapMode">
+        <option value="iteration" selected>Iteration</option>
+        <option value="epic">Epic</option>
+      </select>
+
+      <label for="iterationIds" class="hidden-field">Iteration ID(s)</label>
+      <input id="iterationIds" class="hidden-field" placeholder="2728499 or 2728499,2728501" />
+
+    <label for="iterationSearch">Iteration</label>
+    <div class="iteration-search-wrapper">
+      <input
+        id="iterationSearch"
+        type="text"
+        placeholder="Search by team/date and add iteration..."
+        autocomplete="off"
+      />
+
+      <div id="selectedIterations" class="selected-items hidden"></div>
+
+      <div id="iterationResults" class="search-results hidden"></div>
+    </div>
+
+    <label for="epicIds">Epic ID(s)</label>
+
+      <input id="epicIds" placeholder="123 or 123,124" />
+
+      <div class="row">
+        <div>
+          <label for="scope">Scope</label>
+          <select id="scope">
+            <option value="all" selected>All</option>
+            <option value="assigned_to_me">assigned_to_me</option>
+            <option value="created_by_me">created_by_me</option>
+          </select>
+        </div>
+        <div>
+          <label for="edgeMode">Issues relation types</label>
+          <select id="edgeMode">
+            <option value="all" selected>All</option>
+            <option value="blocking_only">Block/Blocked by</option>
+          </select>
+        </div>
+      </div>
+
+      <label for="plannedOnly">Scheduling types</label>
+      <select id="plannedOnly">
+        <option value="all" selected>All</option>
+        <option value="planned_only">Planned</option>
+      </select>
+      <label for="externalMode">Issues Out of Iteration / Epic </label>
+      <select id="externalMode">
+        <option value="show">Show</option>
+        <option value="hide" selected>Hide</option>
+      </select>
+
+    <label for="parentMode">Epic</label>
+    <select id="parentMode">
+      <option value="show_all" selected>All</option>
+      <option value="hide_qa_passed">
+         Open Epic
+      </option>
+      <option value="hide_all">
+        None
+      </option>
+    </select>
+
+      <button id="loadBtn">Create Map</button>
+      <button id="cancelBtn" class="secondary" disabled>Cancel</button>
+      <div class="toolbar">
+        <button id="fitBtn" class="secondary">Fit</button>
+        <button id="physicsBtn" class="secondary">Physics on/off</button>
+      </div>
+      <div class="toolbar">
+        <button id="pngBtn" class="secondary">Scarica PNG</button>
+        <button id="jsonBtn" class="secondary">Scarica JSON</button>
+      </div>
+
+      <div id="status" class="status">Ready.</div>
+
+      <!-- <div class="stats">
+        <div class="card"><div class="k">Nodi</div><div class="v" id="nodesCount">0</div></div>
+        <div class="card"><div class="k">Link</div><div class="v" id="linksCount">0</div></div>
+      </div> -->
+
+      <h2>Legend</h2>
+      <div id="legend"></div>
+
+      <h2>Uso</h2>
+      <div class="help">
+        - Separatore multiplo: <code>2728499,2728501</code><br>
+        - Doppio click su un nodo: apre l'issue<br>
+        - Hover: dettagli issue<br>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <button id="zoomInBtn">Zoom +</button>
+        <button id="zoomOutBtn">Zoom -</button>
+        <button id="guideBtn">Help</button>
+      </div>
+      <div id="network"></div>
+    </main>
+  </div>
+
+</body>
+</html>
