@@ -1046,7 +1046,7 @@
               hover: { background: baseColor, border: "#ffffff" }
             },
             font: { color: "#eef3ff", size: 14, face: "Inter" },
-            borderWidth: 3,
+            borderWidth: 5,
             title,
             webUrl: n.webUrl,
             iterationId: n.iterationId,
@@ -1321,3 +1321,27 @@
     });
 
     el("iterationIds").addEventListener("input", updateSelectedIterationsUI);
+
+    // ── URL param precompilation ──────────────────────────────────────────────
+    (function applyUrlParams() {
+      const p = new URLSearchParams(window.location.search);
+
+      if (p.get("gitlab_url")) el("gitlabUrl").value = p.get("gitlab_url");
+      if (p.get("token"))      el("token").value      = p.get("token");
+      if (p.get("map_type"))   el("mapMode").value    = p.get("map_type");
+      if (p.get("scope"))      el("scope").value       = p.get("scope");
+      if (p.get("edge_mode"))  el("edgeMode").value    = p.get("edge_mode");
+      if (p.get("external_mode")) el("externalMode").value = p.get("external_mode");
+
+      if (p.get("iteration_id")) {
+        el("iterationIds").value = p.get("iteration_id");
+        syncMapInputs();
+        updateSelectedIterationsUI();
+      }
+
+      const hasId = p.get("iteration_id") || p.get("epic_id");
+      const hasToken = p.get("token");
+      if (hasId && hasToken) {
+        loadGraph();
+      }
+    })();
