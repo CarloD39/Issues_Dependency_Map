@@ -1169,6 +1169,95 @@
       a.click();
     }
 
+    // ── AI Analysis ──────────────────────────────────────────────────────────
+    async function analyzeWithAI() {
+      if (!currentGraph.nodes.length) {
+        setStatus("Genera prima una mappa.", true);
+        return;
+      }
+
+      const aiPanel = el("aiPanel");
+      const aiLoading = el("aiLoading");
+      const aiResult = el("aiResult");
+      const copyBtn = el("copyTeamsBtn");
+
+      aiPanel.style.display = "block";
+      aiLoading.style.display = "block";
+      aiResult.style.display = "none";
+      copyBtn.style.display = "none";
+
+      // Semplifica il JSON prima di mandarlo — toglie i campi visivi inutili
+      const simplified = {
+        nodes: currentGraph.nodes.map(n => ({
+          id: n.id,
+          title: (n.title || "").split("\n")[0],
+          assignee: (n.title || "").match(/👤 ([^\n]+)/)?.[1] || "—",
+          status: (n.title || "").match(/Status::([^,\n]+)/)?.[1] || "—",
+          labels: (n.title || "").match(/🏷️ ([^\n]+)/)?.[1] || "—",
+          external: n.external,
+          temporalStatus: n.temporalStatus,
+          url: n.webUrl,
+          epic: n.parentTitle || "—"
+        })),
+        edges: currentGraph.edges.map(e => ({
+          from: e.from,
+          to: e.to,
+          relation: e.relation
+        }))
+      };
+
+      try {
+        const response = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "claude-sonnet-4-6",
+            max_tokens: 1000,
+            system: `Sei un assistente Scrum Master. Analizza la dependency map di un'iteration GitLab e produci un riassunto conciso e utile per il team, in italiano.
+                      Il formato deve essere:
+                      📊 **Iteration Summary**
+                      - N issue totali, N esterne, N chiuse
+
+                      🔴 **Blocchi critici** (se presenti)
+                      - #ID "Titolo breve" blocca → #ID "Titolo breve" (assignee: X)
+                      - Evidenzia se il blocco viene da un'issue esterna all'iteration
+
+                      ✅ **Issue libere** (senza dipendenze, non chiuse)
+                      - Elenco breve
+
+                      ⚠️ **Attenzione** (se ci sono pattern preoccupanti: issue non assegnate, blocchi a catena, ecc.)
+
+                      Sii conciso. Massimo 300 parole. Non usare markdown pesante, solo emoji e grassetto.`,
+            messages: [{
+              role: "user",
+              content: JSON.stringify(simplified)
+            }]
+          })
+        });
+
+        const data = await response.json();
+        const text = data.content?.[0]?.text || "Nessuna risposta ricevuta.";
+
+        aiLoading.style.display = "none";
+        aiResult.textContent = text;
+        aiResult.style.display = "block";
+        copyBtn.style.display = "block";
+
+        copyBtn.onclick = () => {
+          navigator.clipboard.writeText(text).then(() => {
+            copyBtn.textContent = "✅ Copiato!";
+            setTimeout(() => { copyBtn.textContent = "📋 Copia per Teams"; }, 2000);
+          });
+        };
+
+      } catch (err) {
+        aiLoading.style.display = "none";
+        aiResult.textContent = "Errore durante l'analisi: " + err.message;
+        aiResult.style.display = "block";
+        setStatus("Errore AI: " + err.message, true);
+      }
+    }
+
     el("loadBtn").addEventListener("click", loadGraph);
     el("fitBtn").addEventListener("click", () => network && network.fit({ animation: true }));
     el("physicsBtn").addEventListener("click", () => {
@@ -1188,6 +1277,8 @@
     });
     el("pngBtn").addEventListener("click", downloadPNG);
     el("jsonBtn").addEventListener("click", downloadJSON);
+    el("aiBtn").addEventListener("click", analyzeWithAI);
+
 
     el("gitlabUrl").value = "https://gitlab.com/";
 

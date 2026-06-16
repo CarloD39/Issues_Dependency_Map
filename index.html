@@ -332,8 +332,31 @@
         <button id="zoomInBtn">Zoom +</button>
         <button id="zoomOutBtn">Zoom -</button>
         <button id="guideBtn">Help</button>
+        <button id="aiBtn">✨ Analizza con AI</button>
+
       </div>
       <div id="network"></div>
+
+      <div id="aiPanel" style="display:none; position:absolute; bottom:24px; right:24px; width:360px; max-height:60vh; overflow-y:auto; z-index:100;">
+        <div id="aiLoading" style="display:none; color:var(--muted); font-size:13px; padding:12px;">
+          ⏳ Analisi in corso...
+        </div>
+        <div id="aiResult" style="
+          background: rgba(15,17,26,.97);
+          border: 1px solid rgba(122,162,255,.28);
+          border-radius: 8px;
+          padding: 14px;
+          font-size: 13px;
+          line-height: 1.6;
+          white-space: pre-wrap;
+          color: var(--fg);
+          display:none;">
+        </div>
+        <button id="copyTeamsBtn" style="display:none; margin-top:8px; width:100%;">
+          📋 Copia per Teams
+        </button>
+      </div>
+      
     </main>
   </div>
 
