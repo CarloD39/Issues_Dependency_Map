@@ -1186,20 +1186,18 @@
       aiResult.style.display = "none";
       copyBtn.style.display = "none";
 
-      // Cattura screenshot della mappa come base64
-      let mapBase64 = null;
-      try {
-        const canvas = document.querySelector("#network canvas");
-        if (canvas) mapBase64 = canvas.toDataURL("image/png").split(",")[1];
-      } catch (e) { /* ignora */ }
+      // ------ CATTURA SCREENSHOT DELLA MAPPA COME BASE64 -----
+      //let mapBase64 = null;
+      //try {
+        //const canvas = document.querySelector("#network canvas");
+        //if (canvas) mapBase64 = canvas.toDataURL("image/png").split(",")[1];
+      //} catch (e) { /* ignora */ }
 
       // Messaggio con JSON completo + immagine opzionale
-      const userContent = mapBase64
-        ? [
-            { type: "image", source: { type: "base64", media_type: "image/png", data: mapBase64 } },
-            { type: "text", text: "Genera il template HTML della sprint. JSON:\n" + JSON.stringify({ nodes: currentGraph.nodes, edges: currentGraph.edges }) }
-          ]
-        : [{ type: "text", text: "Genera il template HTML della sprint. JSON:\n" + JSON.stringify({ nodes: currentGraph.nodes, edges: currentGraph.edges }) }];
+      const userContent = [{ 
+        type: "text", 
+        text: "Genera il template HTML della sprint. JSON:\n" + JSON.stringify({ nodes: currentGraph.nodes, edges: currentGraph.edges }) 
+      }];
 
       try {
         const response = await fetch("/api/analyze", {
@@ -1207,7 +1205,7 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             model: "claude-sonnet-4-6",
-            max_tokens: 8000,
+            max_tokens: 5000,
             system: `Sei un assistente Scrum Master esperto. Ricevi il JSON di una dependency map GitLab e devi generare un template HTML descrittivo della sprint.
 
 Il template HTML deve seguire ESATTAMENTE questo design system:
@@ -1244,6 +1242,7 @@ Restituisci SOLO il codice HTML completo, senza backtick, senza spiegazioni. Ini
         });
 
         const data = await response.json();
+        console.log("Token usati:", data.usage);
         if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
 
         const html = data.content?.[0]?.text || "";
