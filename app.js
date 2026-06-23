@@ -1082,6 +1082,7 @@
         if (nodesCountEl) nodesCountEl.textContent = String(allNodes.length);
         if (linksCountEl) linksCountEl.textContent = String(allEdges.length);
         setStatus(`Completato. ${allNodes.length} nodi, ${allEdges.length} link.`);
+        publishMapSilent();
       } catch (err) {
           if (err.name === "AbortError") {
             setStatus("Map creation cancelled.");
@@ -1157,6 +1158,28 @@
       URL.revokeObjectURL(url);
     }
 
+    function getMapKey() {
+      const mode = el("mapMode").value;
+      const ids = mode === "epic"
+        ? el("epicIds").value.trim()
+        : el("iterationIds").value.trim();
+      return `${mode}-${ids.replace(/\s*,\s*/g, ",").replace(/\s+/g, "-")}`;
+    }
+
+    async function publishMapSilent() {
+      const key = getMapKey();
+      try {
+        await fetch("/api/publish-map", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...currentGraph, key })
+        });
+        console.log(`[publish] Mappa pubblicata — chiave: "${key}"`);
+      } catch (e) {
+        console.warn("[publish] Publish automatico fallito:", e.message);
+      }
+    }
+
     function downloadPNG() {
       const canvas = container.querySelector("canvas");
       if (!canvas) {
@@ -1208,35 +1231,35 @@
             max_tokens: 5000,
             system: `Sei un assistente Scrum Master esperto. Ricevi il JSON di una dependency map GitLab e devi generare un template HTML descrittivo della sprint.
 
-Il template HTML deve seguire ESATTAMENTE questo design system:
-- Background body: #1A1A2E | Card: #20203A | Border: #2E2E50 | Font: 'Segoe UI', 13px
-- Badge level: US bg #0F4C75 color #93C5FD | TS bg #1B4332 color #6EE7B7 | Analysis bg #3D1F00 color #FBC174 | Bug bg #7F1D1D color #FCA5A5 | Internal Bug bg #2E2E50 color #B0B0C8
-- Badge status: Done bg #0F6E56 color #9FE1CB | Doing bg #1E3A5F color #93C5FD | To Do bg #252545 color #8080A8 | Ready bg #252545 color #B0B0C8
-- Badge QA: Failed bg #7F1D1D color #FCA5A5 | Ready bg #0F6E56 color #9FE1CB | In Progress bg #1E3A5F color #93C5FD
-- Tag Regression: bg #7C1D1D color #FCA5A5 | Tag Stretched: bg #633806 color #FBC174 | Tag EXT: bg #252545 color #606090
-- Link colore #60A5FA | Assignee colore #8080A8
-- Epic header: border-left 3px solid #b388ff, background #1E1A30, title color #e8e0ff
-- Table row border-bottom: 0.5px solid #252545 | th: bg #1A1A2E color #606090 font-size 10px uppercase
+                    Il template HTML deve seguire ESATTAMENTE questo design system:
+                    - Background body: #1A1A2E | Card: #20203A | Border: #2E2E50 | Font: 'Segoe UI', 13px
+                    - Badge level: US bg #0F4C75 color #93C5FD | TS bg #1B4332 color #6EE7B7 | Analysis bg #3D1F00 color #FBC174 | Bug bg #7F1D1D color #FCA5A5 | Internal Bug bg #2E2E50 color #B0B0C8
+                    - Badge status: Done bg #0F6E56 color #9FE1CB | Doing bg #1E3A5F color #93C5FD | To Do bg #252545 color #8080A8 | Ready bg #252545 color #B0B0C8
+                    - Badge QA: Failed bg #7F1D1D color #FCA5A5 | Ready bg #0F6E56 color #9FE1CB | In Progress bg #1E3A5F color #93C5FD
+                    - Tag Regression: bg #7C1D1D color #FCA5A5 | Tag Stretched: bg #633806 color #FBC174 | Tag EXT: bg #252545 color #606090
+                    - Link colore #60A5FA | Assignee colore #8080A8
+                    - Epic header: border-left 3px solid #b388ff, background #1E1A30, title color #e8e0ff
+                    - Table row border-bottom: 0.5px solid #252545 | th: bg #1A1A2E color #606090 font-size 10px uppercase
 
-Struttura del template:
-1. h1 "Sprint — Team [nome se disponibile]" + div.meta con date e nome file
-2. Alert bar (bg #2D1F00 border #92400E color #FBC174) se ci sono QA Failed o Regression
-3. KPI row: 5 card flex — Totale, Done verde, In corso/Ready blu, To Do grigio, Blocchi attivi rosso
-4. Issue raggruppate per epic tramite parentId. Ogni epic ha header viola e tabella con: # link, Titolo, Tipo badge, Status + QA badge, Assignee. Tag EXT/Regression/Stretched inline dopo #iid.
-5. Sezione "Senza epic" per issue senza parentId
-6. Sezione "Dipendenze": edges blocks → badge rosso "blocks" | edges relates_to → badge grigio "relates"
-7. Footer color #3A3A5A
+                    Struttura del template:
+                    1. h1 "Sprint — Team [nome se disponibile]" + div.meta con date e nome file
+                    2. Alert bar (bg #2D1F00 border #92400E color #FBC174) se ci sono QA Failed o Regression
+                    3. KPI row: 5 card flex — Totale, Done verde, In corso/Ready blu, To Do grigio, Blocchi attivi rosso
+                    4. Issue raggruppate per epic tramite parentId. Ogni epic ha header viola e tabella con: # link, Titolo, Tipo badge, Status + QA badge, Assignee. Tag EXT/Regression/Stretched inline dopo #iid.
+                    5. Sezione "Senza epic" per issue senza parentId
+                    6. Sezione "Dipendenze": edges blocks → badge rosso "blocks" | edges relates_to → badge grigio "relates"
+                    7. Footer color #3A3A5A
 
-Regole estrazione JSON:
-- level da labels: Level::UserStory→US, Level::TechStory→TS, Level::Analysis/POC→Analysis, Level::Bug→Bug, Level::InternalBug→Internal Bug
-- status da labels: Status::Done, Status::Doing, Status::To Do, Status::Ready (escludi Status::QA::*)
-- QA da labels: Status::QA::Failed, Status::QA::Ready, Status::QA::In Progress
-- Regression = "Regression" nelle labels | Stretched = "Scheduling::Stretched" | EXT = external:true
-- isParentNode:true = epic, non una issue
-- edges relation "blocks" = blocchi | "relates_to" = collegati
-- link cliccabile: usa webUrl del nodo
+                    Regole estrazione JSON:
+                    - level da labels: Level::UserStory→US, Level::TechStory→TS, Level::Analysis/POC→Analysis, Level::Bug→Bug, Level::InternalBug→Internal Bug
+                    - status da labels: Status::Done, Status::Doing, Status::To Do, Status::Ready (escludi Status::QA::*)
+                    - QA da labels: Status::QA::Failed, Status::QA::Ready, Status::QA::In Progress
+                    - Regression = "Regression" nelle labels | Stretched = "Scheduling::Stretched" | EXT = external:true
+                    - isParentNode:true = epic, non una issue
+                    - edges relation "blocks" = blocchi | "relates_to" = collegati
+                    - link cliccabile: usa webUrl del nodo
 
-Restituisci SOLO il codice HTML completo, senza backtick, senza spiegazioni. Inizia con <!DOCTYPE html>.`,
+                    Restituisci SOLO il codice HTML completo, senza backtick, senza spiegazioni. Inizia con <!DOCTYPE html>.`,
             messages: [{ role: "user", content: userContent }]
           })
         });
