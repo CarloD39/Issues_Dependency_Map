@@ -10,10 +10,43 @@ app.use(express.static(path.join(__dirname)));
 
 const savedMaps = {};
 
+async function pushToGist(key, graph) {
+  const filename = `${key}.json`;
+  const content = JSON.stringify({ ...graph, key }, null, 2);
+
+  // Cerca gist esistente con questo filename
+  const listRes = await fetch('https://api.github.com/gists', {
+    headers: { Authorization: `Bearer ${process.env.GITHUB_TOKEN}`, 'X-GitHub-Api-Version': '2022-11-28' }
+  });
+  const gists = await listRes.json();
+  const existing = gists.find(g => g.files[filename]);
+
+  if (existing) {
+    await fetch(`https://api.github.com/gists/${existing.id}`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${process.env.GITHUB_TOKEN}`, 'Content-Type': 'application/json', 'X-GitHub-Api-Version': '2022-11-28' },
+      body: JSON.stringify({ files: { [filename]: { content } } })
+    });
+    return existing.id;
+  } else {
+    const createRes = await fetch('https://api.github.com/gists', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${process.env.GITHUB_TOKEN}`, 'Content-Type': 'application/json', 'X-GitHub-Api-Version': '2022-11-28' },
+      body: JSON.stringify({ description: `Dependency map: ${key}`, public: true, files: { [filename]: { content } } })
+    });
+    const data = await createRes.json();
+    return data.id;
+  }
+}
+
 app.post("/api/publish-map", (req, res) => {
   const { key, ...graph } = req.body;
   if (!key) return res.status(400).json({ error: "Parametro 'key' mancante" });
   savedMaps[key] = { ...graph, publishedAt: new Date().toISOString() };
+  pushToGist(key, graph).then(id => {
+    savedMaps[key].gistId = id;
+    console.log(`[gist] Pubblicato su https://gist.github.com/${id}`);
+  }).catch(e => console.warn('[gist] Errore:', e.message));
   res.json({ ok: true, key, publishedAt: savedMaps[key].publishedAt });
 });
 
@@ -25,7 +58,7 @@ app.get("/api/current-map/:key", (req, res) => {
 
 app.get("/api/maps", (req, res) => {
   res.json(Object.entries(savedMaps).map(([key, m]) => ({
-    key, publishedAt: m.publishedAt, nodeCount: m.nodes?.length ?? 0
+    key, publishedAt: m.publishedAt, nodeCount: m.nodes?.length ?? 0, gistId: m.gistId || null
   })));
 });
 
