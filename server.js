@@ -35,6 +35,7 @@ async function pushToGist(key, graph) {
       body: JSON.stringify({ description: `Dependency map: ${key}`, public: true, files: { [filename]: { content } } })
     });
     const data = await createRes.json();
+    console.log('[gist] GitHub response:', JSON.stringify(data).slice(0, 200)); // ← aggiungi
     return data.id;
   }
 }
